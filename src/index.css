@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-app: #0b0e12;
+    --bg-sidebar: #0d1117;
+    --bg-header: #0c1015;
+    --bg-panel: #11161d;
+    --bg-panel-subtle: #151b23;
+    --bg-panel-elevated: #181f28;
+    --border-panel: #242c36;
+    --border-subtle: #1b222c;
+    --border-hover: #303a46;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --brand-primary: #5b9bd5;
+    --brand-accent: #79b8ff;
+    --brand-cyan: #4faf9a;
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.01em;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Custom Scrollbar matching SOC console UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0e12;
+}
+::-webkit-scrollbar-thumb {
+  background: #242c36;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #303a46;
+}
+
+/* Glass & Panel Utilities */
+.panel-border {
+  border: 1px solid #242c36;
+}
+
+.panel-bg {
+  background-color: #11161d;
+}
+
+.subtle-bg {
+  background-color: #151b23;
+}
+
+.elevated-bg {
+  background-color: #181f28;
+}
+
+/* Tech grid background effect */
+.bg-tech-grid {
+  background-image: radial-gradient(rgba(36, 44, 54, 0.5) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Pulse animation for live nodes */
+@keyframes statusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 175, 154, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(79, 175, 154, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 175, 154, 0);
+  }
+}
+
+.status-pulse-green {
+  animation: statusPulse 2s infinite;
+}
+
+/* Glowing text highlight */
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(79, 175, 154, 0.3);
+}
+
+.text-glow-blue {
+  text-shadow: 0 0 10px rgba(91, 155, 213, 0.3);
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+  --bg-app: #f1f5f9;
+  --bg-sidebar: #f8fafc;
+  --bg-header: #ffffff;
+  --bg-panel: #ffffff;
+  --border-panel: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+}
+
+html[data-theme='light'] body,
+html[data-theme='light'] #root,
+html[data-theme='light'] main {
+  background-color: #f1f5f9 !important;
+  color: #0f172a;
+}
+
+html[data-theme='light'] [class*="bg-[#0b0e12]"] { background-color: #f1f5f9 !important; }
+html[data-theme='light'] [class*="bg-[#0c1015]"] { background-color: #eaf0f6 !important; }
+html[data-theme='light'] [class*="bg-[#0d1117]"] { background-color: #f8fafc !important; }
+html[data-theme='light'] [class*="bg-[#11161d]"] { background-color: #ffffff !important; }
+html[data-theme='light'] [class*="bg-[#151b23]"] { background-color: #f1f5f9 !important; }
+html[data-theme='light'] [class*="bg-[#181f28]"] { background-color: #e8eef5 !important; }
+html[data-theme='light'] [class*="border-[#242c36]"],
+html[data-theme='light'] [class*="border-[#1b222c]"] { border-color: #cbd5e1 !important; }
+html[data-theme='light'] [class*="text-[#e6edf3]"] { color: #0f172a !important; }
+html[data-theme='light'] [class*="text-[#8b949e]"] { color: #475569 !important; }
+html[data-theme='light'] [class*="text-[#6e7681]"] { color: #64748b !important; }
+html[data-theme='light'] select,
+html[data-theme='light'] input,
+html[data-theme='light'] textarea { color-scheme: light; }
+html[data-theme='light'] ::-webkit-scrollbar-track { background: #e2e8f0; }
+html[data-theme='light'] ::-webkit-scrollbar-thumb { background: #94a3b8; }
