@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
 import { createServer as createViteServer } from 'vite';
 import { handleApi } from './api.mjs';
 
@@ -8,12 +9,29 @@ const server = createServer((request, response) => {
     void handleApi(request, response);
     return;
   }
-  vite.middlewares(request, response, error => {
+  vite.middlewares(request, response, async error => {
     if (error) {
       vite.ssrFixStacktrace(error);
       response.statusCode = 500;
       response.end('Development server error');
+      return;
     }
+    if (request.method === 'GET' && request.headers.accept?.includes('text/html')) {
+      try {
+        const template = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+        const html = await vite.transformIndexHtml(request.url || '/', template);
+        response.statusCode = 200;
+        response.setHeader('Content-Type', 'text/html; charset=utf-8');
+        response.end(html);
+      } catch (transformError) {
+        console.error('Unable to serve the development app entry point.', transformError);
+        response.statusCode = 500;
+        response.end('Unable to render the development app.');
+      }
+      return;
+    }
+    response.statusCode = 404;
+    response.end('Not found.');
   });
 });
 server.listen(Number(process.env.PORT || 4173), process.env.HOST || '0.0.0.0', () => {
