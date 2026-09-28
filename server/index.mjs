@@ -2,8 +2,13 @@ import { createServer } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEnv } from 'vite';
 import { handleApi } from './api.mjs';
 
+const localEnv = loadEnv('production', process.cwd(), '');
+for (const key of ['GEMINI_API_KEY', 'GEMINI_MODEL', 'PORT', 'HOST']) {
+  if (process.env[key] === undefined && localEnv[key]) process.env[key] = localEnv[key];
+}
 const root = resolve(fileURLToPath(new URL('../dist/', import.meta.url)));
 const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
 

@@ -17,7 +17,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChange, onOpenVoiceModal, dataMode, demoFallback, theme, onThemeChange, onSelectComplaint }) => {
-  const { complaints, projects, recommendations } = useAppData();
+  const { complaints, projects, recommendations, gaps } = useAppData();
   const navigate = useNavigate();
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -27,13 +27,14 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
   const activeLang = SUPPORTED_LANGUAGES.find(language => language.code === currentLanguage) || SUPPORTED_LANGUAGES[0];
   const normalizedTerm = searchTerm.trim().toLowerCase();
   const results = useMemo(() => {
-    if (!normalizedTerm) return { requests: [], projects: [], recommendations: [], districts: [] };
+    if (!normalizedTerm) return { requests: [], projects: [], recommendations: [], gaps: [], districts: [] };
     const requests = complaints.filter(item => `${item.id} ${item.rawText} ${item.translatedText} ${item.district} ${item.state} ${item.category}`.toLowerCase().includes(normalizedTerm)).slice(0, 4);
     const projectMatches = projects.filter(item => `${item.id} ${item.title} ${item.state} ${item.district} ${item.category}`.toLowerCase().includes(normalizedTerm)).slice(0, 3);
     const recommendationMatches = recommendations.filter(item => `${item.title} ${item.state} ${item.district} ${item.category}`.toLowerCase().includes(normalizedTerm)).slice(0, 3);
+    const gapMatches = gaps.filter(item => `${item.state} ${item.district} ${item.category} ${item.status}`.toLowerCase().includes(normalizedTerm)).slice(0, 3);
     const districts = [...new Set(complaints.filter(item => `${item.district} ${item.state}`.toLowerCase().includes(normalizedTerm)).map(item => `${item.district}, ${item.state}`))].slice(0, 3);
-    return { requests, projects: projectMatches, recommendations: recommendationMatches, districts };
-  }, [complaints, projects, recommendations, normalizedTerm]);
+    return { requests, projects: projectMatches, recommendations: recommendationMatches, gaps: gapMatches, districts };
+  }, [complaints, projects, recommendations, gaps, normalizedTerm]);
   const notificationCount = complaints.filter(item => item.status === 'new' || item.severity === 'critical').length;
 
   useEffect(() => {
@@ -58,15 +59,15 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
   const nextTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark';
 
   return (
-    <header className="h-14 bg-[#0c1015] border-b border-[#242c36] px-4 flex items-center justify-between sticky top-0 z-40 select-none gap-3">
+    <header className="app-header h-14 bg-[#0c1015] border-b border-[#242c36] px-4 flex items-center justify-between sticky top-0 z-40 select-none gap-3">
       <div className="flex items-center gap-3 shrink-0">
         <div className="w-8 h-8 rounded bg-sky-900/30 border border-sky-500/40 flex items-center justify-center text-sky-400 font-bold text-sm">JS</div>
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-base tracking-tight text-[#e6edf3]">JanSetu <span className="text-[#5b9bd5]">AI</span></span>
-            <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#151b23] text-[#8b949e] border border-[#242c36]">DPI-v2.4</span>
+            <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#151b23] text-[#8b949e] border border-[#242c36]">BETA</span>
           </div>
-          <p className="text-[10px] text-[#6e7681] hidden sm:block">National Infrastructure Intelligence Platform</p>
+          <p className="text-[10px] text-[#6e7681] hidden sm:block">Civic infrastructure workspace</p>
         </div>
       </div>
 
@@ -78,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
           value={searchTerm}
           onFocus={() => setSearchOpen(true)}
           onChange={event => { setSearchTerm(event.target.value); setSearchOpen(true); }}
-          onKeyDown={event => { if (event.key === 'Enter' && normalizedTerm) navigate('/requests'); }}
+          onKeyDown={event => { if (event.key === 'Enter' && normalizedTerm) { navigate(`/requests?search=${encodeURIComponent(searchTerm.trim())}`); setSearchOpen(false); } }}
           placeholder="Search requests, districts, projects..."
           aria-label="Search requests, districts, projects and recommendations"
           className="w-full bg-[#0b0e12] border border-[#242c36] focus:border-[#5b9bd5] rounded pl-9 pr-14 py-1.5 text-xs text-[#e6edf3] placeholder-[#6e7681] outline-none font-mono"
@@ -86,11 +87,12 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
         <span className="absolute right-2.5 top-2 px-1.5 py-0.5 rounded text-[9px] font-mono text-[#6e7681] bg-[#151b23] border border-[#242c36]">⌘K</span>
         {searchOpen && normalizedTerm && (
           <div className="absolute top-full mt-2 left-0 right-0 max-h-[70vh] overflow-y-auto rounded border border-[#303a46] bg-[#11161d] shadow-2xl z-50 p-2">
-            {!results.requests.length && !results.projects.length && !results.recommendations.length && !results.districts.length && <p className="p-3 text-xs text-[#8b949e]">No matching records.</p>}
-            {results.requests.map(item => <button key={item.id} onClick={() => selectRequest(item)} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs"><span className="text-sky-400 font-mono">{item.id}</span><span className="ml-2 text-[#e6edf3]">{item.district}, {item.state}</span><p className="truncate text-[#8b949e] mt-1">{item.translatedText}</p></button>)}
-            {results.projects.map(item => <button key={item.id} onClick={() => { navigate('/projects'); setSearchOpen(false); }} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs"><span className="text-emerald-400 font-mono">{item.id}</span><span className="ml-2 text-[#e6edf3]">{item.title}</span></button>)}
-            {results.recommendations.map(item => <button key={item.id} onClick={() => { navigate('/recommendations'); setSearchOpen(false); }} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs"><span className="text-amber-400">Recommendation</span><span className="ml-2 text-[#e6edf3]">{item.title}</span></button>)}
-            {results.districts.map(item => <button key={item} onClick={() => { setSearchTerm(item.split(',')[0]); navigate('/requests'); setSearchOpen(false); }} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs text-[#e6edf3]">District: {item}</button>)}
+            {!results.requests.length && !results.projects.length && !results.recommendations.length && !results.gaps.length && !results.districts.length && <p className="p-3 text-xs text-[#8b949e]">No matching records.</p>}
+            {results.requests.map(item => <button key={item.id} onClick={() => selectRequest(item)} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs"><span className="text-sky-400 font-mono">Request · {item.id}</span><span className="ml-2 text-[#e6edf3]">{item.district}, {item.state}</span><p className="truncate text-[#8b949e] mt-1">{item.translatedText}</p></button>)}
+            {results.projects.map(item => <button key={item.id} onClick={() => { navigate(`/projects?search=${encodeURIComponent(item.id)}`); setSearchOpen(false); }} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs"><span className="text-emerald-400 font-mono">Project · {item.id}</span><span className="ml-2 text-[#e6edf3]">{item.title}</span></button>)}
+            {results.recommendations.map(item => <button key={item.id} onClick={() => { navigate(`/recommendations?search=${encodeURIComponent(item.id)}`); setSearchOpen(false); }} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs"><span className="text-amber-400">Recommendation</span><span className="ml-2 text-[#e6edf3]">{item.title}</span></button>)}
+            {results.gaps.map(item => <button key={item.id} onClick={() => { navigate(`/gaps?search=${encodeURIComponent(item.district)}`); setSearchOpen(false); }} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs"><span className="text-rose-400">Infrastructure gap</span><span className="ml-2 text-[#e6edf3]">{item.district}, {item.state} · {item.category}</span></button>)}
+            {results.districts.map(item => <button key={item} onClick={() => { const district = item.split(',')[0]; navigate(`/requests?search=${encodeURIComponent(district)}`); setSearchOpen(false); }} className="w-full text-left p-2 rounded hover:bg-[#181f28] text-xs text-[#e6edf3]">District: {item}</button>)}
           </div>
         )}
       </div>
@@ -104,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
           {theme === 'light' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
         <div className="relative">
-          <button onClick={() => setLangDropdownOpen(!langDropdownOpen)} aria-expanded={langDropdownOpen} className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-[#11161d] hover:bg-[#181f28] border border-[#242c36] text-xs text-[#e6edf3]">
+          <button onClick={() => setLangDropdownOpen(!langDropdownOpen)} aria-label="Select citizen request language" title="Select the language used for citizen request transcription and analysis" aria-expanded={langDropdownOpen} className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-[#11161d] hover:bg-[#181f28] border border-[#242c36] text-xs text-[#e6edf3]">
             <Globe className="w-3.5 h-3.5 text-[#5b9bd5]" /><span className="font-mono">{activeLang.flag} {activeLang.nativeName}</span><ChevronDown className="w-3 h-3 text-[#6e7681]" />
           </button>
           {langDropdownOpen && <div className="absolute right-0 mt-1 w-52 max-h-72 overflow-y-auto bg-[#11161d] border border-[#242c36] rounded shadow-xl py-1 z-50">

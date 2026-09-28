@@ -7,13 +7,7 @@ import {
   Mic,
   Sparkles,
   MapPin,
-  Users,
-  FileText,
   Layers,
-  CheckCircle,
-  Volume2,
-  Share2,
-  ExternalLink
 } from 'lucide-react';
 
 interface RequestDrawerProps {

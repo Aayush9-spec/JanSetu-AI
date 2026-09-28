@@ -1,5 +1,5 @@
 import React from 'react';
-import { SeverityLevel, UrgencyLevel, CategoryType } from '../../types';
+import { SeverityLevel, CategoryType } from '../../types';
 
 interface SeverityBadgeProps {
   level: SeverityLevel;

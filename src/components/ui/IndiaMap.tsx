@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { useAppData } from '../../state/AppDataContext';
 import { DemandCluster, CategoryType } from '../../types';
-import { MapPin, Layers, Filter, Eye, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface IndiaMapProps {
   selectedCategory?: string;
   selectedState?: string;
+  selectedDistrict?: string;
   onStateChange?: (state: string) => void;
   onSelectCluster?: (cluster: DemandCluster) => void;
 }
@@ -13,19 +14,28 @@ interface IndiaMapProps {
 export const IndiaMap: React.FC<IndiaMapProps> = ({
   selectedCategory = 'all',
   selectedState = 'all',
+  selectedDistrict = 'all',
   onStateChange,
   onSelectCluster
 }) => {
   const [activeLayer, setActiveLayer] = useState<'heatmap' | 'clusters' | 'gaps'>('clusters');
   const [hoveredCluster, setHoveredCluster] = useState<DemandCluster | null>(null);
-  const { hotspots } = useAppData();
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 800, height: 580 });
+  const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const { hotspots, gaps } = useAppData();
 
   // Scaled coordinates for SVG rendering on custom India Map path layout
   const mapHotspots = hotspots.filter(h => {
     if (selectedCategory !== 'all' && h.category !== selectedCategory) return false;
     if (selectedState !== 'all' && h.state !== selectedState) return false;
+    if (selectedDistrict !== 'all' && h.district !== selectedDistrict) return false;
     return true;
   });
+  const mapGaps = gaps.filter(gap =>
+    (selectedCategory === 'all' || gap.category === selectedCategory) &&
+    (selectedState === 'all' || gap.state === selectedState) &&
+    (selectedDistrict === 'all' || gap.district === selectedDistrict)
+  );
 
   // State coordinate mapping for India Map SVG
   const stateRegions = [
@@ -59,6 +69,24 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
       default: return '#4faf9a';
     }
   };
+  const zoom = (factor: number) => setViewBox(current => {
+    const width = Math.max(320, Math.min(800, current.width * factor));
+    const height = width * 580 / 800;
+    return { x: (800 - width) / 2, y: (580 - height) / 2, width, height };
+  });
+  const pan = (event: React.PointerEvent<SVGSVGElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    dragRef.current = { ...drag, x: event.clientX, y: event.clientY };
+    setViewBox(current => ({
+      ...current,
+      x: Math.max(0, Math.min(800 - current.width, current.x - dx * current.width / bounds.width)),
+      y: Math.max(0, Math.min(580 - current.height, current.y - dy * current.height / bounds.height)),
+    }));
+  };
 
   return (
     <div className="bg-[#11161d] border border-[#242c36] rounded p-4 relative overflow-hidden flex flex-col h-[520px] select-none shadow-xs">
@@ -67,14 +95,14 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#e6edf3]">
-              National Infrastructure Intelligence Map
+              Illustrative Infrastructure Map
             </span>
             <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-900/30 text-sky-400 border border-sky-500/30">
               GIS ACTIVE
             </span>
           </div>
           <p className="text-[11px] text-[#6e7681] font-mono mt-0.5">
-            Geospatial Demand Hotspots & National Infrastructure Deficits
+            Schematic regional markers · bundled demo records
           </p>
         </div>
 
@@ -84,6 +112,7 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
           <div className="flex items-center bg-[#0b0e12] border border-[#242c36] rounded p-0.5">
             <button
               onClick={() => setActiveLayer('clusters')}
+              aria-pressed={activeLayer === 'clusters'}
               className={`px-2.5 py-1 rounded text-[10px] font-mono transition-colors ${
                 activeLayer === 'clusters' ? 'bg-[#181f28] text-[#5b9bd5] font-semibold' : 'text-[#8b949e] hover:text-[#e6edf3]'
               }`}
@@ -92,6 +121,7 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
             </button>
             <button
               onClick={() => setActiveLayer('heatmap')}
+              aria-pressed={activeLayer === 'heatmap'}
               className={`px-2.5 py-1 rounded text-[10px] font-mono transition-colors ${
                 activeLayer === 'heatmap' ? 'bg-[#181f28] text-amber-400 font-semibold' : 'text-[#8b949e] hover:text-[#e6edf3]'
               }`}
@@ -100,12 +130,18 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
             </button>
             <button
               onClick={() => setActiveLayer('gaps')}
+              aria-pressed={activeLayer === 'gaps'}
               className={`px-2.5 py-1 rounded text-[10px] font-mono transition-colors ${
                 activeLayer === 'gaps' ? 'bg-[#181f28] text-rose-400 font-semibold' : 'text-[#8b949e] hover:text-[#e6edf3]'
               }`}
             >
               Infra Gaps
             </button>
+          </div>
+          <div className="flex items-center gap-1" aria-label="Map zoom controls">
+            <button onClick={() => zoom(0.8)} aria-label="Zoom in map" title="Zoom in" className="p-1 rounded border border-[#242c36] text-[#8b949e] hover:text-[#e6edf3]"><ZoomIn className="w-3.5 h-3.5" /></button>
+            <button onClick={() => zoom(1.25)} aria-label="Zoom out map" title="Zoom out" className="p-1 rounded border border-[#242c36] text-[#8b949e] hover:text-[#e6edf3]"><ZoomOut className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setViewBox({ x: 0, y: 0, width: 800, height: 580 })} aria-label="Reset map view" title="Reset map view" className="p-1 rounded border border-[#242c36] text-[#8b949e] hover:text-[#e6edf3]"><RotateCcw className="w-3.5 h-3.5" /></button>
           </div>
 
           {/* State Filter */}
@@ -155,7 +191,22 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
         </div>
 
         {/* SVG Map Container */}
-        <svg viewBox="0 0 800 580" className="w-full h-full max-h-[460px]">
+        <svg
+          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+          className="w-full h-full max-h-[460px] touch-none"
+          aria-label="Schematic India infrastructure map. Drag the background to pan."
+          onPointerDown={event => {
+            if (event.target !== event.currentTarget) return;
+            dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={pan}
+          onPointerUp={event => {
+            dragRef.current = null;
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+          }}
+          onPointerCancel={() => { dragRef.current = null; }}
+        >
           {/* State Boundary Paths */}
           <g>
             {stateRegions.map((st) => (
@@ -167,6 +218,15 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
                 strokeWidth="1.5"
                 className="hover:fill-[#181f28] transition-colors cursor-pointer"
                 onClick={() => onStateChange?.(selectedState === st.name ? 'all' : st.name)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Filter map to ${st.name}`}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onStateChange?.(selectedState === st.name ? 'all' : st.name);
+                  }
+                }}
               >
                 <title>{st.name}</title>
               </path>
@@ -190,7 +250,7 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
           })}
 
           {/* Interactive Cluster Pin Markers */}
-          {mapHotspots.map((cluster) => {
+          {activeLayer !== 'gaps' && mapHotspots.map((cluster) => {
             const pos = clusterCoords[cluster.id] || { x: 400, y: 250 };
             const catColor = getCategoryColor(cluster.category);
             const isHovered = hoveredCluster?.id === cluster.id;
@@ -203,6 +263,15 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
                 onMouseEnter={() => setHoveredCluster(cluster)}
                 onMouseLeave={() => setHoveredCluster(null)}
                 onClick={() => onSelectCluster && onSelectCluster(cluster)}
+                role="button"
+                tabIndex={0}
+                aria-label={`View ${cluster.district} hotspot, priority ${cluster.priorityScore}`}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onSelectCluster?.(cluster);
+                  }
+                }}
               >
                 {/* Pulse Ring */}
                 <circle
@@ -238,6 +307,31 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
                 >
                   {cluster.district} ({cluster.priorityScore})
                 </text>
+              </g>
+            );
+          })}
+          {activeLayer === 'gaps' && mapGaps.map(gap => {
+            const cluster = hotspots.find(item => item.district === gap.district && item.state === gap.state);
+            const pos = cluster ? clusterCoords[cluster.id] || { x: 400, y: 250 } : { x: 400, y: 250 };
+            return (
+              <g
+                key={gap.id}
+                transform={`translate(${pos.x}, ${pos.y})`}
+                role="button"
+                tabIndex={0}
+                aria-label={`${gap.district} ${gap.category} sample gap: ${gap.coverageGapPercent} percent`}
+                className="cursor-pointer"
+                onClick={() => onStateChange?.(gap.state)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onStateChange?.(gap.state);
+                  }
+                }}
+              >
+                <title>{`${gap.district}: illustrative ${gap.coverageGapPercent}% coverage gap`}</title>
+                <circle r={Math.max(8, gap.coverageGapPercent / 2)} fill="#e05252" opacity="0.78" stroke="#fecaca" strokeWidth="2" />
+                <text x="14" y="4" fill="#e6edf3" fontSize="11" fontFamily="JetBrains Mono">{gap.district} · {gap.coverageGapPercent}%</text>
               </g>
             );
           })}
@@ -285,7 +379,7 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
           <span>Mapped Clusters: <strong className="text-[#5b9bd5]">{mapHotspots.length} Regions</strong></span>
         </div>
         <div>
-          <span>Coordinates: <strong className="text-[#6e7681]">20.5937° N, 78.9629° E</strong></span>
+          <span>Schematic, not survey-grade coordinates</span>
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ dist/
 !.env.example
 .DS_Store
 .vite/
+.vercel/
 .impeccable/
 .playwright-mcp/
 coverage/

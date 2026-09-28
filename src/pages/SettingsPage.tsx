@@ -5,7 +5,7 @@ import { DataMode, useAppData } from '../state/AppDataContext';
 interface SettingsPageProps { theme: string; onThemeChange: (theme: string) => void }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onThemeChange }) => {
-  const { dataMode, demoFallback, setDataMode, resetDemoData, complaints, projects } = useAppData();
+  const { dataMode, demoFallback, dataLoading, setDataMode, refreshData, resetDemoData, complaints, projects } = useAppData();
   const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -30,7 +30,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onThemeChange
         <h2 className="text-sm font-semibold text-[#e6edf3] flex items-center gap-2"><Database className="w-4 h-4 text-sky-400" />Data provider</h2>
         <p className="text-xs text-[#8b949e]">Mock mode works offline. Real and Hybrid try the configured read-only data API, then fall back to local demo records if it is missing or unavailable.</p>
         <div className="flex flex-wrap gap-2">{(['mock', 'hybrid', 'real'] as DataMode[]).map(mode => <button key={mode} onClick={() => setDataMode(mode)} aria-pressed={dataMode === mode} className={`px-3 py-2 rounded border text-xs capitalize ${dataMode === mode ? 'border-sky-500 bg-sky-900/20 text-sky-300' : 'border-[#242c36] text-[#8b949e]'}`}>{mode}</button>)}</div>
-        <p role="status" className={`text-xs ${demoFallback ? 'text-amber-300' : 'text-emerald-300'}`}>{demoFallback ? 'Demo data active — configured external API is not available.' : `Active provider mode: ${dataMode}.`}</p>
+        <p role="status" className={`text-xs ${demoFallback ? 'text-amber-300' : 'text-emerald-300'}`}>{dataLoading ? 'Loading from configured provider…' : demoFallback ? 'Demo data active — no configured provider responded.' : `Active provider mode: ${dataMode}.`}</p>
+        {dataMode !== 'mock' && <button onClick={refreshData} disabled={dataLoading} className="px-3 py-2 rounded border border-[#242c36] text-sky-300 text-xs disabled:opacity-50">{dataLoading ? 'Retrying…' : 'Retry configured provider'}</button>}
       </section>
 
       <section className="p-5 rounded bg-[#11161d] border border-[#242c36] space-y-4 max-w-3xl">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { PriorityScoreDetails } from '../../types';
-import { ShieldCheck, Info } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 interface EvidencePanelProps {
   scoreDetails: PriorityScoreDetails;
@@ -30,7 +30,7 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ scoreDetails, rati
       <div className="flex items-center justify-between border-b border-[#242c36] pb-2">
         <div className="flex items-center gap-2 font-mono font-bold text-[#e6edf3]">
           <ShieldCheck className="w-4 h-4 text-[#4faf9a]" />
-          <span>Transparent AI Priority Scoring Evidence</span>
+          <span>Transparent Priority Scoring Evidence</span>
         </div>
         <span className="font-mono text-xs font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">
           TOTAL SCORE: {scoreDetails.totalScore}/100
@@ -39,7 +39,7 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({ scoreDetails, rati
 
       {/* Rationale Text */}
       <p className="text-[#8b949e] leading-relaxed font-sans bg-[#0b0e12] p-3 rounded border border-[#1b222c]">
-        <strong className="text-[#e6edf3]">AI Intelligence Rationale:</strong> {rationale}
+        <strong className="text-[#e6edf3]">Scoring rationale:</strong> {rationale}
       </p>
 
       {/* Score Breakdown Weights Table */}

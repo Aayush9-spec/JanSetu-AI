@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ProjectRecommendation } from '../types';
+import { useSearchParams } from 'react-router-dom';
 import { PriorityScoreBadge } from '../components/ui/StatusBadge';
 import { EvidencePanel } from '../components/ui/EvidencePanel';
 import {
@@ -7,27 +7,24 @@ import {
   ChevronDown,
   ChevronUp,
   MapPin,
-  FileSpreadsheet,
-  CheckCircle,
-  ExternalLink,
-  ShieldCheck,
-  ArrowRight
+  RefreshCw
 } from 'lucide-react';
 import { useAppData } from '../state/AppDataContext';
 import { Project } from '../types';
+import { generateRecommendations } from '../services/recommendationService';
 
-interface RecommendationsPageProps {
-  onSelectRecommendation?: (rec: ProjectRecommendation) => void;
-}
-
-export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ onSelectRecommendation }) => {
-  const { recommendations, updateRecommendationStatus, addProject, projects } = useAppData();
-  const [expandedId, setExpandedId] = useState<string | null>(recommendations[0]?.id ?? null);
+export const RecommendationsPage: React.FC = () => {
+  const { recommendations, updateRecommendationStatus, addProject, addRecommendation, projects, gaps, complaints } = useAppData();
+  const [searchParams] = useSearchParams();
+  const [expandedId, setExpandedId] = useState<string | null>(() => searchParams.get('search') || recommendations[0]?.id || null);
+  const [query, setQuery] = useState(() => searchParams.get('search') || '');
   const [category, setCategory] = useState('all');
   const [status, setStatus] = useState('all');
+  const [generationMessage, setGenerationMessage] = useState('');
   const filtered = useMemo(() => recommendations.filter(item =>
-    (category === 'all' || item.category === category) && (status === 'all' || item.status === status)
-  ), [recommendations, category, status]);
+    (category === 'all' || item.category === category) && (status === 'all' || item.status === status) &&
+    `${item.id} ${item.title} ${item.district} ${item.state} ${item.category}`.toLowerCase().includes(query.toLowerCase())
+  ), [recommendations, category, status, query]);
   const approve = (recommendation: typeof recommendations[number]) => {
     updateRecommendationStatus(recommendation.id, 'Approved');
     const project: Project = {
@@ -40,6 +37,15 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ onSele
     };
     addProject(project);
   };
+  const generateFromLoadedData = () => {
+    const generated = generateRecommendations(gaps, complaints, projects);
+    generated.forEach(addRecommendation);
+    setCategory('all');
+    setStatus('all');
+    setQuery('');
+    setExpandedId(generated[0]?.id ?? null);
+    setGenerationMessage(`Updated ${generated.length} proposals with transparent local scoring. Gap reference data is illustrative; validate it before acting.`);
+  };
 
   return (
     <div className="p-6 space-y-6 select-none font-sans">
@@ -48,19 +54,22 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ onSele
         <div>
           <h1 className="text-xl font-mono font-bold text-[#e6edf3] tracking-tight flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-sky-400 animate-pulse" />
-            <span>AI Infrastructure Project Recommendations</span>
+            <span>Infrastructure Planning Recommendations</span>
           </h1>
           <p className="text-xs text-[#8b949e] font-mono mt-1">
-            Evidence-scored proposals from current citizen demand and infrastructure datasets
+            Sample proposals scored from illustrative records; validate source data before acting.
           </p>
         </div>
 
-        <span className="px-3 py-1.5 rounded bg-sky-900/30 text-sky-400 border border-sky-500/30 text-xs font-mono font-semibold">
-          {recommendations.length} PROPOSALS
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-3 py-1.5 rounded bg-sky-900/30 text-sky-400 border border-sky-500/30 text-xs font-mono font-semibold">{recommendations.length} LOADED PROPOSALS</span>
+          <button onClick={generateFromLoadedData} className="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-white border border-sky-500 text-xs font-medium flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" />Generate from loaded data</button>
+        </div>
       </div>
+      {generationMessage && <p role="status" className="text-xs text-amber-300">{generationMessage}</p>}
 
       <div className="flex gap-2 flex-wrap">
+        <input aria-label="Search recommendations" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search recommendation or location" className="bg-[#11161d] border border-[#242c36] rounded px-3 py-2 text-xs text-[#e6edf3]" />
         <select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter recommendation category" className="bg-[#11161d] border border-[#242c36] rounded px-3 py-2 text-xs text-[#e6edf3]">
           <option value="all">All sectors</option>{['road', 'water', 'health', 'electricity', 'education'].map(item => <option key={item}>{item}</option>)}
         </select>
@@ -133,8 +142,6 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ onSele
                   <div className="text-[10px] text-[#6e7681]">BENEFICIARIES</div>
                   <div className="text-sm font-bold text-[#4faf9a]">{rec.estimatedBeneficiaries.toLocaleString()} citizens</div>
                 </div>
-                {!filtered.length && <div className="p-8 text-center text-[#8b949e]">No recommendations match these filters.</div>}
-
                 <div className="p-2.5 rounded bg-[#0b0e12] border border-[#1b222c]">
                   <div className="text-[10px] text-[#6e7681]">PROPOSED TIMELINE</div>
                   <div className="text-sm font-bold text-amber-400">{rec.estimatedTimelineMonths} Months</div>
@@ -154,6 +161,7 @@ export const RecommendationsPage: React.FC<RecommendationsPageProps> = ({ onSele
             </div>
           );
         })}
+        {!filtered.length && <div className="p-8 text-center text-sm text-[#8b949e]">No recommendations match these filters. Clear the search or status filters to see more.</div>}
       </div>
     </div>
   );

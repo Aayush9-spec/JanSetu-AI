@@ -129,7 +129,7 @@ export interface ProjectRecommendation {
   createdAt: string;
 }
 
-export type ProjectStatus = 'Recommended' | 'Under Review' | 'Approved' | 'In Progress' | 'Completed' | 'Impact Measured';
+export type ProjectStatus = 'Recommended' | 'Under Review' | 'Approved' | 'In Progress' | 'Completed' | 'Impact Measured' | 'Rejected';
 
 export interface Project {
   id: string;

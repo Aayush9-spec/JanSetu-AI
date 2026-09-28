@@ -1,9 +1,20 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { createServer as createViteServer } from 'vite';
+import { createServer as createViteServer, loadEnv } from 'vite';
 import { handleApi } from './api.mjs';
 
-const vite = await createViteServer({ server: { middlewareMode: true, hmr: { server: undefined } }, appType: 'custom' });
+const localEnv = loadEnv('development', process.cwd(), '');
+for (const key of ['GEMINI_API_KEY', 'GEMINI_MODEL', 'PORT', 'HOST', 'VITE_HMR_PORT']) {
+  if (process.env[key] === undefined && localEnv[key]) process.env[key] = localEnv[key];
+}
+const hmrPort = Number(process.env.VITE_HMR_PORT);
+const vite = await createViteServer({
+  server: {
+    middlewareMode: true,
+    hmr: { server: undefined, ...(Number.isInteger(hmrPort) && hmrPort > 0 ? { port: hmrPort } : {}) },
+  },
+  appType: 'custom',
+});
 const server = createServer((request, response) => {
   if ((request.url || '').startsWith('/api/')) {
     void handleApi(request, response);

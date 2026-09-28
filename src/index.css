@@ -135,3 +135,24 @@ html[data-theme='light'] input,
 html[data-theme='light'] textarea { color-scheme: light; }
 html[data-theme='light'] ::-webkit-scrollbar-track { background: #e2e8f0; }
 html[data-theme='light'] ::-webkit-scrollbar-thumb { background: #94a3b8; }
+
+@media print {
+  .app-header, aside, button, select, label, nav { display: none !important; }
+  body, #root, main, .report-content {
+    background: #fff !important;
+    color: #111827 !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  .report-content {
+    border: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .report-content * {
+    color: #111827 !important;
+    border-color: #d1d5db !important;
+  }
+  @page { margin: 18mm; }
+}

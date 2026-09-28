@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { MOCK_HOTSPOTS, MOCK_RECOMMENDATIONS } from '../data/mockData';
-import { DemandCluster, ProjectRecommendation } from '../types';
+import { ProjectRecommendation } from '../types';
 import { PriorityScoreBadge } from '../components/ui/StatusBadge';
-import { Flame, MapPin, Users, Layers, Sparkles, ArrowRight } from 'lucide-react';
+import { Flame, ArrowRight } from 'lucide-react';
+import { useAppData } from '../state/AppDataContext';
 
 interface HotspotsPageProps {
   onSelectRecommendation: (rec: ProjectRecommendation) => void;
@@ -10,8 +10,8 @@ interface HotspotsPageProps {
 
 export const HotspotsPage: React.FC<HotspotsPageProps> = ({ onSelectRecommendation }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-
-  const filtered = MOCK_HOTSPOTS.filter(h =>
+  const { hotspots, recommendations } = useAppData();
+  const filtered = hotspots.filter(h =>
     selectedCategory === 'all' || h.category === selectedCategory
   );
 
@@ -25,7 +25,7 @@ export const HotspotsPage: React.FC<HotspotsPageProps> = ({ onSelectRecommendati
             <span>Demand Hotspots & Spatial Density Matrix</span>
           </h1>
           <p className="text-xs text-[#8b949e] font-mono mt-1">
-            Clustered citizen demands cross-referenced with Census population data & infrastructure deficit scores
+            Sample clusters from the bundled dataset. Demographics and infrastructure scores are not externally verified.
           </p>
         </div>
 
@@ -102,17 +102,19 @@ export const HotspotsPage: React.FC<HotspotsPageProps> = ({ onSelectRecommendati
 
               <button
                 onClick={() => {
-                  const rec = MOCK_RECOMMENDATIONS.find(r => r.clusterId === hotspot.id) || MOCK_RECOMMENDATIONS[0];
-                  onSelectRecommendation(rec);
+                  const recommendation = recommendations.find(item => item.clusterId === hotspot.id);
+                  if (recommendation) onSelectRecommendation(recommendation);
                 }}
-                className="w-full py-2 rounded bg-[#181f28] hover:bg-[#242c36] text-sky-400 border border-sky-500/30 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                disabled={!recommendations.some(item => item.clusterId === hotspot.id)}
+                className="w-full py-2 rounded bg-[#181f28] hover:bg-[#242c36] text-sky-400 border border-sky-500/30 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>View AI Project Recommendation</span>
+                <span>View planning recommendation</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         ))}
+        {!filtered.length && <p className="col-span-full p-8 text-center text-xs text-[#8b949e]">No hotspots match this sector.</p>}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { Complaint, CategoryType, SeverityLevel } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Complaint } from '../types';
 import { SeverityBadge, CategoryBadge } from '../components/ui/StatusBadge';
 import { Search, Download, Mic, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppData } from '../state/AppDataContext';
@@ -13,23 +14,36 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
   onSelectComplaint,
   onOpenVoiceModal
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') || '');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [stateFilter, setStateFilter] = useState<string>('all');
+  const [districtFilter, setDistrictFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [languageFilter, setLanguageFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState('all');
   const [sort, setSort] = useState('newest');
   const [page, setPage] = useState(1);
   const pageSize = 5;
   const { complaints } = useAppData();
+  const districts = useMemo(() => [...new Set(complaints.map(item => item.district).filter(Boolean))].sort(), [complaints]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, categoryFilter, severityFilter, stateFilter, districtFilter, statusFilter, languageFilter, dateFilter, sort]);
 
   const filteredComplaints = useMemo(() => complaints.filter(c => {
     if (categoryFilter !== 'all' && c.category !== categoryFilter) return false;
     if (severityFilter !== 'all' && c.severity !== severityFilter) return false;
     if (stateFilter !== 'all' && c.state !== stateFilter) return false;
+    if (districtFilter !== 'all' && c.district !== districtFilter) return false;
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
     if (languageFilter !== 'all' && c.rawLanguage !== languageFilter) return false;
+    if (dateFilter !== 'all') {
+      const ageDays = (Date.now() - Date.parse(c.createdAt)) / 86400000;
+      if (!Number.isFinite(ageDays) || ageDays > Number(dateFilter)) return false;
+    }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       return (
@@ -37,7 +51,8 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
         c.rawText.toLowerCase().includes(term) ||
         c.translatedText.toLowerCase().includes(term) ||
         c.district.toLowerCase().includes(term) ||
-        c.state.toLowerCase().includes(term)
+        c.state.toLowerCase().includes(term) ||
+        c.extractedEntities.join(' ').toLowerCase().includes(term)
       );
     }
     return true;
@@ -46,7 +61,7 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
     if (sort === 'priority') return ({ critical: 4, high: 3, medium: 2, low: 1 }[b.severity] - { critical: 4, high: 3, medium: 2, low: 1 }[a.severity]);
     if (sort === 'affected') return b.estimatedAffected - a.estimatedAffected;
     return Date.parse(b.createdAt) - Date.parse(a.createdAt);
-  }), [complaints, categoryFilter, severityFilter, stateFilter, statusFilter, languageFilter, searchTerm, sort]);
+  }), [complaints, categoryFilter, severityFilter, stateFilter, districtFilter, statusFilter, languageFilter, dateFilter, searchTerm, sort]);
   const pageCount = Math.max(1, Math.ceil(filteredComplaints.length / pageSize));
   const visibleComplaints = filteredComplaints.slice((page - 1) * pageSize, page * pageSize);
   const exportCsv = () => {
@@ -112,6 +127,9 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
             <option value="health">Health</option>
             <option value="electricity">Electricity</option>
             <option value="education">Education</option>
+            <option value="sanitation">Sanitation</option>
+            <option value="telecom">Telecom</option>
+            <option value="agriculture">Agriculture</option>
           </select>
           <select aria-label="Filter request status" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} className="bg-[#0b0e12] border border-[#242c36] text-[#e6edf3] text-xs font-mono rounded px-2 py-1.5">
             <option value="all">All statuses</option><option value="new">New</option><option value="clustered">Clustered</option><option value="analyzed">Analyzed</option><option value="recommended">Recommended</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option>
@@ -145,6 +163,12 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
             <option value="Bihar">Bihar</option>
             <option value="Maharashtra">Maharashtra</option>
             <option value="Rajasthan">Rajasthan</option>
+          </select>
+          <select aria-label="Filter request district" value={districtFilter} onChange={e => setDistrictFilter(e.target.value)} className="bg-[#0b0e12] border border-[#242c36] text-[#e6edf3] text-xs font-mono rounded px-2 py-1.5">
+            <option value="all">All districts</option>{districts.map(district => <option key={district}>{district}</option>)}
+          </select>
+          <select aria-label="Filter request date range" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-[#0b0e12] border border-[#242c36] text-[#e6edf3] text-xs font-mono rounded px-2 py-1.5">
+            <option value="all">Any date</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option>
           </select>
         </div>
       </div>
@@ -211,7 +235,7 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
                   </td>
                 </tr>
               ))}
-              {!visibleComplaints.length && <tr><td colSpan={8} className="p-8 text-center text-[#8b949e]">No requests match these filters. Clear a filter or submit a new request.</td></tr>}
+              {!visibleComplaints.length && <tr><td colSpan={8} className="p-8 text-center text-[#8b949e]">No requests match these filters. <button onClick={() => { setSearchTerm(''); setCategoryFilter('all'); setSeverityFilter('all'); setStateFilter('all'); setDistrictFilter('all'); setStatusFilter('all'); setLanguageFilter('all'); setDateFilter('all'); }} className="text-sky-400 underline">Clear filters</button> or submit a new request.</td></tr>}
             </tbody>
           </table>
         </div>

@@ -17,7 +17,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          charts: ['recharts'],
           router: ['react-router-dom'],
         },
       },
