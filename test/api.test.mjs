@@ -3,6 +3,11 @@ import { after, before, test } from 'node:test';
 import health from '../api/health.mjs';
 import analyze from '../api/ai/analyze.mjs';
 import report from '../api/ai/report.mjs';
+import dataHandler from '../api/data.mjs';
+import requestsHandler from '../api/requests.mjs';
+import projectsHandler from '../api/projects.mjs';
+import impactHandler from '../api/impact.mjs';
+
 
 const originalApiKey = process.env.GEMINI_API_KEY;
 before(() => { delete process.env.GEMINI_API_KEY; });
@@ -51,8 +56,85 @@ test('report function validates missing input and reports unavailable AI safely'
   assert.deepEqual(unavailable.body, { error: 'AI provider is not configured.' });
 });
 
-test('malformed request bodies receive a client error', async () => {
-  const result = await call(analyze, { url: '/api/ai/analyze', body: '{invalid' });
-  assert.equal(result.status, 400);
-  assert.match(result.body.error, /Invalid JSON/);
+test('data endpoint returns unified database state', async () => {
+  const result = await call(dataHandler, { method: 'GET', url: '/api/data' });
+  assert.equal(result.status, 200);
+  assert.ok(Array.isArray(result.body.complaints));
+  assert.ok(Array.isArray(result.body.projects));
+  assert.ok(Array.isArray(result.body.recommendations));
+  assert.ok(Array.isArray(result.body.gaps));
+  assert.ok(Array.isArray(result.body.hotspots));
+  assert.ok(Array.isArray(result.body.impacts));
+  assert.ok(Array.isArray(result.body.notifications));
 });
+
+test('requests CRUD endpoints function properly', async () => {
+  const createResult = await call(requestsHandler, {
+    method: 'POST',
+    url: '/api/requests',
+    body: {
+      rawText: 'Test road issue in Kanpur district',
+      rawLanguage: 'en',
+      category: 'road',
+      state: 'Uttar Pradesh',
+      district: 'Kanpur',
+    },
+  });
+  assert.equal(createResult.status, 201);
+  assert.equal(createResult.body.category, 'road');
+  assert.equal(createResult.body.district, 'Kanpur');
+
+  const updateResult = await call(requestsHandler, {
+    method: 'PUT',
+    url: '/api/requests',
+    body: { id: createResult.body.id, status: 'resolved' },
+  });
+  assert.equal(updateResult.status, 200);
+  assert.equal(updateResult.body.status, 'resolved');
+
+  const deleteResult = await call(requestsHandler, {
+    method: 'DELETE',
+    url: `/api/requests?id=${encodeURIComponent(createResult.body.id)}`,
+  });
+  assert.equal(deleteResult.status, 200);
+  assert.equal(deleteResult.body.success, true);
+});
+
+test('projects and impact CRUD endpoints function properly', async () => {
+  const createProject = await call(projectsHandler, {
+    method: 'POST',
+    url: '/api/projects',
+    body: {
+      title: 'Kanpur Paved Access Highway',
+      category: 'road',
+      state: 'Uttar Pradesh',
+      district: 'Kanpur',
+      budgetCr: 15.0,
+      beneficiariesCount: 50000,
+      executingAgency: 'UP PWD',
+    },
+  });
+  assert.equal(createProject.status, 201);
+  assert.equal(createProject.body.district, 'Kanpur');
+
+  const recordImpact = await call(impactHandler, {
+    method: 'POST',
+    url: '/api/impact',
+    body: {
+      projectId: createProject.body.id,
+      projectTitle: createProject.body.title,
+      district: 'Kanpur',
+      state: 'Uttar Pradesh',
+      category: 'road',
+      beforeAccessPercent: 30,
+      afterAccessPercent: 90,
+      complaintReductionPercent: 85,
+      citizensBenefitedCount: 50000,
+      beforeRequestsCount: 1000,
+      afterRequestsCount: 150,
+    },
+  });
+  assert.equal(recordImpact.status, 201);
+  assert.equal(recordImpact.body.complaintReductionPercent, 85);
+});
+

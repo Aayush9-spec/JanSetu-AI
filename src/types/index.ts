@@ -163,3 +163,14 @@ export interface ImpactMetric {
   afterRequestsCount: number;
   sdgGoals: string[];
 }
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: 'alert' | 'milestone' | 'info';
+  link: string;
+  isRead: boolean;
+  createdAt: string;
+}
+

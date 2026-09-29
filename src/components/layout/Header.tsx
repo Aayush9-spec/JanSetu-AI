@@ -17,7 +17,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChange, onOpenVoiceModal, dataMode, demoFallback, theme, onThemeChange, onSelectComplaint }) => {
-  const { complaints, projects, recommendations, gaps } = useAppData();
+  const { complaints, projects, recommendations, gaps, notifications, markNotificationsRead } = useAppData();
   const navigate = useNavigate();
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
     const districts = [...new Set(complaints.filter(item => `${item.district} ${item.state}`.toLowerCase().includes(normalizedTerm)).map(item => `${item.district}, ${item.state}`))].slice(0, 3);
     return { requests, projects: projectMatches, recommendations: recommendationMatches, gaps: gapMatches, districts };
   }, [complaints, projects, recommendations, gaps, normalizedTerm]);
-  const notificationCount = complaints.filter(item => item.status === 'new' || item.severity === 'critical').length;
+  const unreadCount = notifications.filter(item => !item.isRead).length;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -116,14 +116,34 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
           </div>}
         </div>
         <div className="relative">
-          <button onClick={() => setNotificationsOpen(!notificationsOpen)} aria-label={`${notificationCount} notifications`} aria-expanded={notificationsOpen} className="relative p-1.5 rounded hover:bg-[#181f28] text-[#8b949e] hover:text-[#e6edf3]">
-            <Bell className="w-4 h-4" />{notificationCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-[9px] text-white flex items-center justify-center">{Math.min(notificationCount, 99)}</span>}
+          <button onClick={() => setNotificationsOpen(!notificationsOpen)} aria-label={`${unreadCount} notifications`} aria-expanded={notificationsOpen} className="relative p-1.5 rounded hover:bg-[#181f28] text-[#8b949e] hover:text-[#e6edf3]">
+            <Bell className="w-4 h-4" />{unreadCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-[9px] text-white flex items-center justify-center font-mono font-bold">{Math.min(unreadCount, 99)}</span>}
           </button>
-          {notificationsOpen && <div className="absolute right-0 mt-2 w-72 bg-[#11161d] border border-[#242c36] rounded shadow-xl z-50 p-3">
-            <div className="text-xs font-semibold text-[#e6edf3] mb-2">Current alerts</div>
-            {complaints.filter(item => item.status === 'new' || item.severity === 'critical').slice(0, 4).map(item => <button key={item.id} onClick={() => { selectRequest(item); setNotificationsOpen(false); }} className="block w-full text-left border-t border-[#242c36] py-2 text-xs"><span className="text-rose-400">{item.severity.toUpperCase()}</span><span className="ml-2 text-[#e6edf3]">{item.category} request in {item.district}</span></button>)}
-            {projects.filter(item => item.status === 'Completed' || item.status === 'In Progress').slice(0, 2).map(item => <div key={item.id} className="border-t border-[#242c36] py-2 text-xs text-[#8b949e]">Project {item.status.toLowerCase()}: {item.title}</div>)}
-            {!notificationCount && !projects.length && <p className="text-xs text-[#8b949e]">No current alerts.</p>}
+          {notificationsOpen && <div className="absolute right-0 mt-2 w-80 bg-[#11161d] border border-[#242c36] rounded shadow-xl z-50 p-3 space-y-2">
+            <div className="flex items-center justify-between border-b border-[#242c36] pb-2">
+              <span className="text-xs font-semibold text-[#e6edf3]">Notifications & Alerts</span>
+              {unreadCount > 0 && <button onClick={() => markNotificationsRead()} className="text-[10px] font-mono text-sky-400 hover:underline">Mark all read</button>}
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+              {notifications.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    markNotificationsRead(item.id);
+                    navigate(item.link || '/dashboard');
+                    setNotificationsOpen(false);
+                  }}
+                  className={`block w-full text-left p-2 rounded border transition-colors ${item.isRead ? 'bg-[#0b0e12] border-[#1b222c] opacity-75' : 'bg-[#151b23] border-[#242c36]'}`}
+                >
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className={item.type === 'alert' ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>{item.title}</span>
+                    <span className="text-[9px] text-[#6e7681]">{new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <p className="text-xs text-[#e6edf3] mt-1 leading-tight">{item.message}</p>
+                </button>
+              ))}
+              {!notifications.length && <p className="text-xs text-[#8b949e] py-2 text-center">No notifications at this time.</p>}
+            </div>
           </div>}
         </div>
       </div>
@@ -131,3 +151,4 @@ export const Header: React.FC<HeaderProps> = ({ currentLanguage, onLanguageChang
     </header>
   );
 };
+

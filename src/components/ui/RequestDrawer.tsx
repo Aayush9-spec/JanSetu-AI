@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Complaint } from '../../types';
 import { useAppData } from '../../state/AppDataContext';
 import { SeverityBadge, CategoryBadge } from './StatusBadge';
@@ -8,6 +8,8 @@ import {
   Sparkles,
   MapPin,
   Layers,
+  Trash2,
+  FolderKanban,
 } from 'lucide-react';
 
 interface RequestDrawerProps {
@@ -16,8 +18,19 @@ interface RequestDrawerProps {
 }
 
 export const RequestDrawer: React.FC<RequestDrawerProps> = ({ complaint, onClose }) => {
-  const { updateComplaintStatus } = useAppData();
+  const { updateComplaintStatus, deleteComplaint, projects, gaps } = useAppData();
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
   if (!complaint) return null;
+
+  const matchingProjects = projects.filter(p => p.district === complaint.district && p.category === complaint.category);
+  const matchingGaps = gaps.filter(g => g.district === complaint.district && g.category === complaint.category);
+
+  const handleDelete = () => {
+    deleteComplaint(complaint.id);
+    setShowConfirmDelete(false);
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex justify-end animate-in fade-in duration-150 select-none">
@@ -53,7 +66,7 @@ export const RequestDrawer: React.FC<RequestDrawerProps> = ({ complaint, onClose
 
             {complaint.inputMode === 'voice' && (
               <div className="p-2.5 rounded bg-[#0b0e12] border border-[#1b222c] text-[11px] text-[#8b949e]">
-                Recording is not retained in demo mode; the submitted transcript is shown below.
+                Recording processed and transcribed via speech recognition.
               </div>
             )}
 
@@ -110,11 +123,11 @@ export const RequestDrawer: React.FC<RequestDrawerProps> = ({ complaint, onClose
             </div>
           </div>
 
-          {/* Section 3: Geographic & Demographic Context */}
+          {/* Section 3: Geographic & Related Infrastructure */}
           <div className="p-4 rounded bg-[#11161d] border border-[#242c36] space-y-3">
             <div className="flex items-center gap-2 text-xs font-mono text-[#e6edf3] font-semibold border-b border-[#242c36] pb-2">
               <MapPin className="w-4 h-4 text-rose-400" />
-              <span>Location & Infrastructure Gap Cross-Check</span>
+              <span>Location & District Context</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs font-mono text-[#8b949e]">
@@ -124,27 +137,91 @@ export const RequestDrawer: React.FC<RequestDrawerProps> = ({ complaint, onClose
               <div>Village: <span className="text-[#e6edf3]">{complaint.village}</span></div>
             </div>
 
-            <div className="p-3 rounded bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 font-mono flex items-center gap-2">
-              <Layers className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>Infrastructure gap context is indicative demo data; verify district conditions before allocation.</span>
-            </div>
+            {/* Related Infrastructure Gaps */}
+            {matchingGaps.length > 0 && (
+              <div className="pt-2 border-t border-[#1b222c] space-y-1.5">
+                <div className="flex items-center gap-1.5 text-[11px] font-mono text-amber-400 font-semibold">
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Matching Infrastructure Gap</span>
+                </div>
+                {matchingGaps.map(gap => (
+                  <div key={gap.id} className="p-2 rounded bg-[#0b0e12] text-xs font-mono flex items-center justify-between text-[#e6edf3]">
+                    <span>{gap.district}, {gap.state} ({gap.category})</span>
+                    <span className="text-rose-400 font-bold">-{gap.coverageGapPercent}% Gap</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Related Projects */}
+            {matchingProjects.length > 0 && (
+              <div className="pt-2 border-t border-[#1b222c] space-y-1.5">
+                <div className="flex items-center gap-1.5 text-[11px] font-mono text-sky-400 font-semibold">
+                  <FolderKanban className="w-3.5 h-3.5" />
+                  <span>Matching Registered Projects</span>
+                </div>
+                {matchingProjects.map(proj => (
+                  <div key={proj.id} className="p-2 rounded bg-[#0b0e12] text-xs font-mono flex items-center justify-between text-[#e6edf3]">
+                    <span className="truncate max-w-[240px]">{proj.title}</span>
+                    <span className="text-emerald-400 font-semibold">{proj.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-[#242c36] bg-[#0c1015] flex items-center justify-between">
+        <div className="p-4 border-t border-[#242c36] bg-[#0c1015] flex flex-wrap items-center justify-between gap-3">
           <div className="text-[10px] font-mono text-[#6e7681]">
-            SUBMITTED: {new Date(complaint.createdAt).toLocaleDateString()} · STATUS: {complaint.status.replace('_', ' ').toUpperCase()}
+            SUBMITTED: {new Date(complaint.createdAt).toLocaleDateString()}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowConfirmDelete(true)}
+              className="px-2.5 py-1.5 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
+            </button>
             <label htmlFor="request-status" className="sr-only">Update request status</label>
-            <select id="request-status" value={complaint.status} onChange={event => updateComplaintStatus(complaint.id, event.target.value as Complaint['status'])} className="max-w-32 bg-[#11161d] border border-[#242c36] text-[#e6edf3] rounded px-2 py-1.5 text-[10px]">
+            <select id="request-status" value={complaint.status} onChange={event => updateComplaintStatus(complaint.id, event.target.value as Complaint['status'])} className="bg-[#11161d] border border-[#242c36] text-[#e6edf3] rounded px-2 py-1.5 text-xs font-mono">
               {['new', 'clustered', 'analyzed', 'recommended', 'in_progress', 'resolved'].map(status => <option key={status} value={status}>{status.replace('_', ' ')}</option>)}
             </select>
-            <button onClick={onClose} className="px-4 py-1.5 rounded bg-[#5b9bd5] hover:bg-[#4a88c7] text-[#0b0e12] font-semibold text-xs">Close</button>
+            <button onClick={onClose} className="px-4 py-1.5 rounded bg-[#5b9bd5] hover:bg-[#4a88c7] text-[#0b0e12] font-semibold text-xs font-mono cursor-pointer">Close</button>
           </div>
         </div>
       </div>
+
+      {/* Confirm Delete Dialog */}
+      {showConfirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-md bg-[#11161d] border border-rose-500/40 rounded-lg p-5 space-y-4 shadow-2xl">
+            <h3 className="text-sm font-bold text-[#e6edf3] font-mono flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>Confirm Grievance Deletion</span>
+            </h3>
+            <p className="text-xs text-[#8b949e] leading-relaxed font-sans">
+              Are you sure you want to delete request <strong className="text-[#e6edf3] font-mono">{complaint.id}</strong> ({complaint.district}, {complaint.state})? This action will remove the record permanently from the database.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowConfirmDelete(false)}
+                className="px-3 py-1.5 rounded border border-[#242c36] text-[#8b949e] text-xs font-mono"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold"
+              >
+                Permanently Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

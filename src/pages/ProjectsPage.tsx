@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PriorityScoreBadge } from '../components/ui/StatusBadge';
-import { FolderKanban, Download, Search, ArrowRight } from 'lucide-react';
-import { ImpactMetric, Project, ProjectStatus } from '../types';
+import { FolderKanban, Download, Search, ArrowRight, Plus, X } from 'lucide-react';
+import { CategoryType, ImpactMetric, Project, ProjectStatus } from '../types';
 import { useAppData } from '../state/AppDataContext';
 
 export const ProjectsPage: React.FC = () => {
-  const { projects, updateProjectStatus, recordProjectImpact } = useAppData();
+  const { projects, addProject, updateProjectStatus, recordProjectImpact } = useAppData();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get('search') || '');
   const [status, setStatus] = useState('all');
@@ -14,10 +14,28 @@ export const ProjectsPage: React.FC = () => {
   const [measurementProject, setMeasurementProject] = useState<Project | null>(null);
   const [measurementError, setMeasurementError] = useState('');
   const [measurement, setMeasurement] = useState({ beforeAccess: '', afterAccess: '', beforeRequests: '', afterRequests: '', citizens: '' });
+  
+  // New Project Form Modal state
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [newProject, setNewProject] = useState({
+    title: '',
+    category: 'road' as CategoryType,
+    state: 'Uttar Pradesh',
+    district: '',
+    budgetCr: '',
+    beneficiariesCount: '',
+    priorityScore: '80',
+    executingAgency: '',
+    startDate: new Date().toISOString().slice(0, 10),
+    targetDate: new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10),
+  });
+
   const visibleProjects = useMemo(() => projects.filter(project =>
     (status === 'all' || project.status === status) &&
     `${project.id} ${project.title} ${project.state} ${project.district} ${project.category}`.toLowerCase().includes(query.toLowerCase())
   ), [projects, status, query]);
+
   const advance = (projectId: string, current: ProjectStatus) => {
     const next: Partial<Record<ProjectStatus, ProjectStatus>> = {
       Recommended: 'Under Review', 'Under Review': 'Approved', Approved: 'In Progress',
@@ -26,11 +44,54 @@ export const ProjectsPage: React.FC = () => {
     const target = next[current];
     if (target) updateProjectStatus(projectId, target);
   };
+
   const exportCsv = () => {
     const rows = [['ID', 'Title', 'Category', 'District', 'State', 'Budget Cr', 'Beneficiaries', 'Priority', 'Completion', 'Status'], ...visibleProjects.map(project => [project.id, project.title, project.category, project.district, project.state, project.budgetCr, project.beneficiariesCount, project.priorityScore, project.completionPercent, project.status])];
     const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
     const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); link.download = 'jansetu-projects.csv'; link.click(); URL.revokeObjectURL(link.href);
   };
+
+  const handleCreateProject = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!newProject.title.trim() || !newProject.district.trim() || !newProject.executingAgency.trim()) {
+      setCreateError('Project title, district, and executing agency are required.');
+      return;
+    }
+    const budget = Number(newProject.budgetCr);
+    const beneficiaries = Number(newProject.beneficiariesCount);
+    const priority = Number(newProject.priorityScore);
+    if (!Number.isFinite(budget) || budget <= 0 || !Number.isFinite(beneficiaries) || beneficiaries <= 0) {
+      setCreateError('Allocated budget and target beneficiaries must be positive numbers.');
+      return;
+    }
+
+    const created: Project = {
+      id: `PRJ-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+      title: newProject.title.trim(),
+      category: newProject.category,
+      state: newProject.state.trim(),
+      district: newProject.district.trim(),
+      budgetCr: budget,
+      beneficiariesCount: beneficiaries,
+      priorityScore: priority,
+      status: 'Approved',
+      completionPercent: 0,
+      startDate: newProject.startDate,
+      targetDate: newProject.targetDate,
+      executingAgency: newProject.executingAgency.trim(),
+    };
+
+    addProject(created);
+    setIsCreatingProject(false);
+    setCreateError('');
+    setNewProject({
+      title: '', category: 'road', state: 'Uttar Pradesh', district: '',
+      budgetCr: '', beneficiariesCount: '', priorityScore: '80',
+      executingAgency: '', startDate: new Date().toISOString().slice(0, 10),
+      targetDate: new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10),
+    });
+  };
+
   const measureImpact = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!measurementProject) return;
@@ -64,6 +125,7 @@ export const ProjectsPage: React.FC = () => {
     setMeasurementError('');
     setMeasurement({ beforeAccess: '', afterAccess: '', beforeRequests: '', afterRequests: '', citizens: '' });
   };
+
   return (
     <div className="p-6 space-y-6 select-none font-sans">
       {/* Header */}
@@ -74,20 +136,25 @@ export const ProjectsPage: React.FC = () => {
             <span>Infrastructure Projects Execution Board</span>
           </h1>
           <p className="text-xs text-[#8b949e] font-mono mt-1">
-            Track the sample project lifecycle. Status changes are persisted in this browser only.
+            Track project lifecycle, register new interventions, and measure community impact.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-xs text-[#8b949e]">
-          <span className="px-2.5 py-1 rounded bg-[#11161d] border border-[#242c36]">
-            Active sample projects: <strong className="text-[#5b9bd5]">{projects.filter(project => !['Completed', 'Impact Measured', 'Rejected'].includes(project.status)).length}</strong>
-          </span>
-          <button onClick={exportCsv} className="px-3 py-1.5 border border-[#242c36] rounded text-sky-400 flex items-center gap-1"><Download className="w-3.5 h-3.5" />Export CSV</button>
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <button
+            onClick={() => setIsCreatingProject(true)}
+            className="px-3.5 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Register Project</span>
+          </button>
+          <button onClick={exportCsv} className="px-3 py-1.5 border border-[#242c36] rounded text-sky-400 hover:bg-[#181f28] flex items-center gap-1"><Download className="w-3.5 h-3.5" />Export CSV</button>
         </div>
       </div>
+
       <div className="flex flex-wrap gap-2 p-3 rounded bg-[#11161d] border border-[#242c36]">
         <div className="relative flex-1 min-w-48"><Search className="w-4 h-4 absolute left-3 top-2.5 text-[#6e7681]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search project or location" className="w-full bg-[#0b0e12] border border-[#242c36] rounded pl-9 pr-3 py-2 text-xs text-[#e6edf3]" /></div>
-        <select value={status} onChange={event => setStatus(event.target.value)} aria-label="Filter project status" className="bg-[#0b0e12] border border-[#242c36] text-[#e6edf3] rounded px-3 text-xs">        <option value="all">All statuses</option>{['Recommended','Under Review','Approved','In Progress','Completed','Impact Measured','Rejected'].map(value => <option key={value}>{value}</option>)}</select>
+        <select value={status} onChange={event => setStatus(event.target.value)} aria-label="Filter project status" className="bg-[#0b0e12] border border-[#242c36] text-[#e6edf3] rounded px-3 text-xs font-mono">        <option value="all">All statuses</option>{['Recommended','Under Review','Approved','In Progress','Completed','Impact Measured','Rejected'].map(value => <option key={value}>{value}</option>)}</select>
       </div>
 
       {/* Projects Kanban Table */}
@@ -143,6 +210,99 @@ export const ProjectsPage: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Create Project Modal */}
+        {isCreatingProject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <form role="dialog" aria-modal="true" aria-labelledby="create-project-title" onSubmit={handleCreateProject} className="w-full max-w-xl space-y-4 rounded-lg border border-[#242c36] bg-[#11161d] p-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-[#242c36] pb-3">
+                <h2 id="create-project-title" className="text-sm font-mono font-bold text-[#e6edf3]">Register New Infrastructure Project</h2>
+                <button type="button" onClick={() => setIsCreatingProject(false)} className="text-[#8b949e] hover:text-[#e6edf3]"><X className="w-4 h-4" /></button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[#8b949e] mb-1">Project Name / Title <span className="text-rose-400">*</span></label>
+                  <input required type="text" value={newProject.title} onChange={e => setNewProject(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Lucknow Rural All-Weather Road Construction" className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2.5 text-[#e6edf3] outline-none font-sans" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">Infrastructure Sector <span className="text-rose-400">*</span></label>
+                    <select value={newProject.category} onChange={e => setNewProject(p => ({ ...p, category: e.target.value as CategoryType }))} className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] font-mono">
+                      <option value="road">Roads & Bridges</option>
+                      <option value="water">Piped Water</option>
+                      <option value="health">Healthcare PHCs</option>
+                      <option value="electricity">Power Grid</option>
+                      <option value="education">School Education</option>
+                      <option value="sanitation">Sanitation</option>
+                      <option value="telecom">Telecom</option>
+                      <option value="agriculture">Agriculture</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">State <span className="text-rose-400">*</span></label>
+                    <select value={newProject.state} onChange={e => setNewProject(p => ({ ...p, state: e.target.value }))} className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] font-mono">
+                      <option value="Uttar Pradesh">Uttar Pradesh</option>
+                      <option value="Bihar">Bihar</option>
+                      <option value="Maharashtra">Maharashtra</option>
+                      <option value="Rajasthan">Rajasthan</option>
+                      <option value="Madhya Pradesh">Madhya Pradesh</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">District <span className="text-rose-400">*</span></label>
+                    <input required type="text" value={newProject.district} onChange={e => setNewProject(p => ({ ...p, district: e.target.value }))} placeholder="e.g. Lucknow" className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] outline-none font-mono" />
+                  </div>
+
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">Executing Agency <span className="text-rose-400">*</span></label>
+                    <input required type="text" value={newProject.executingAgency} onChange={e => setNewProject(p => ({ ...p, executingAgency: e.target.value }))} placeholder="e.g. UP PWD Department" className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] outline-none font-sans" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">Budget (₹ Cr) <span className="text-rose-400">*</span></label>
+                    <input required type="number" step="0.1" min="0.1" value={newProject.budgetCr} onChange={e => setNewProject(p => ({ ...p, budgetCr: e.target.value }))} placeholder="12.5" className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] outline-none font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">Beneficiaries <span className="text-rose-400">*</span></label>
+                    <input required type="number" min="100" value={newProject.beneficiariesCount} onChange={e => setNewProject(p => ({ ...p, beneficiariesCount: e.target.value }))} placeholder="50000" className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] outline-none font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">Priority Score</label>
+                    <input type="number" min="1" max="100" value={newProject.priorityScore} onChange={e => setNewProject(p => ({ ...p, priorityScore: e.target.value }))} className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] outline-none font-mono" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">Start Date</label>
+                    <input type="date" value={newProject.startDate} onChange={e => setNewProject(p => ({ ...p, startDate: e.target.value }))} className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[#8b949e] mb-1">Target Completion</label>
+                    <input type="date" value={newProject.targetDate} onChange={e => setNewProject(p => ({ ...p, targetDate: e.target.value }))} className="w-full bg-[#0b0e12] border border-[#242c36] rounded p-2 text-[#e6edf3] font-mono" />
+                  </div>
+                </div>
+              </div>
+
+              {createError && <p role="alert" className="text-xs text-rose-300 font-mono">{createError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#242c36]">
+                <button type="button" onClick={() => setIsCreatingProject(false)} className="rounded border border-[#242c36] px-3 py-2 text-xs font-mono text-[#8b949e]">Cancel</button>
+                <button type="submit" className="rounded bg-sky-600 hover:bg-sky-500 px-4 py-2 text-xs font-mono font-bold text-white">Save Project</button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Measure Impact Modal */}
         {measurementProject && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
           <form role="dialog" aria-modal="true" aria-labelledby="impact-measure-title" onSubmit={measureImpact} className="w-full max-w-lg space-y-4 rounded-lg border border-[#242c36] bg-[#11161d] p-5 shadow-2xl">
             <div><h2 id="impact-measure-title" className="text-sm font-bold text-[#e6edf3]">Record observed project impact</h2><p className="mt-1 text-xs text-[#8b949e]">{measurementProject.title} · Enter validated measurements; this does not estimate outcomes.</p></div>
@@ -163,3 +323,4 @@ export const ProjectsPage: React.FC = () => {
     </div>
   );
 };
+
